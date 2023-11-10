@@ -81,6 +81,7 @@ cv::Mat getImageFromMsg(const sensor_msgs::ImageConstPtr &img_msg)
 }
 
 // extract images with same timestamp from two topics
+// 从两个不同的图像数据流（可能是左右相机）中提取具有相同时间戳的图像，并将它们传递给估计器（Estimator）。
 void sync_process()
 {
     while(1)
@@ -91,11 +92,11 @@ void sync_process()
             std_msgs::Header header;
             double time = 0;
             m_buf.lock();
-            if (!img0_buf.empty() && !img1_buf.empty())
+            if (!img0_buf.empty() && !img1_buf.empty()) // 左右相机都不为空
             {
                 double time0 = img0_buf.front()->header.stamp.toSec();
                 double time1 = img1_buf.front()->header.stamp.toSec();
-                // 0.003s sync tolerance
+                // 0.003s sync tolerance    使两个图像具有相同时间戳
                 if(time0 < time1 - 0.003)
                 {
                     img0_buf.pop();
@@ -106,11 +107,11 @@ void sync_process()
                     img1_buf.pop();
                     printf("throw img1\n");
                 }
-                else
+                else    // 有相同时间戳
                 {
                     time = img0_buf.front()->header.stamp.toSec();
                     header = img0_buf.front()->header;
-                    image0 = getImageFromMsg(img0_buf.front());
+                    image0 = getImageFromMsg(img0_buf.front()); // 从ROS消息中提取左相机图像
                     img0_buf.pop();
                     image1 = getImageFromMsg(img1_buf.front());
                     img1_buf.pop();
@@ -118,8 +119,8 @@ void sync_process()
                 }
             }
             m_buf.unlock();
-            if(!image0.empty())
-                estimator.inputImage(time, image0, image1);
+            if(!image0.empty())// 检查左相机图像是否有效（非空）
+                estimator.inputImage(time, image0, image1);// 调用估计器处理同步的左右相机图像
         }
         else
         {
@@ -127,7 +128,7 @@ void sync_process()
             std_msgs::Header header;
             double time = 0;
             m_buf.lock();
-            if(!img0_buf.empty())
+            if(!img0_buf.empty())   //左相机非空
             {
                 time = img0_buf.front()->header.stamp.toSec();
                 header = img0_buf.front()->header;
@@ -144,7 +145,7 @@ void sync_process()
     }
 }
 
-
+// 接收imu消息（时间戳、线加速度、角速度），然后传给estimator估计器
 void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
 {
     double t = imu_msg->header.stamp.toSec();
@@ -164,17 +165,19 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
 void feature_callback(const sensor_msgs::PointCloudConstPtr &feature_msg)
 {
     map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> featureFrame;
+    // 遍历接收到的特征点消息中的每个特征点
     for (unsigned int i = 0; i < feature_msg->points.size(); i++)
     {
-        int feature_id = feature_msg->channels[0].values[i];
-        int camera_id = feature_msg->channels[1].values[i];
-        double x = feature_msg->points[i].x;
+        int feature_id = feature_msg->channels[0].values[i];//特征点的ID
+        int camera_id = feature_msg->channels[1].values[i];//camera_id
+        double x = feature_msg->points[i].x;//位置信息
         double y = feature_msg->points[i].y;
         double z = feature_msg->points[i].z;
-        double p_u = feature_msg->channels[2].values[i];
+        double p_u = feature_msg->channels[2].values[i];//像素坐标
         double p_v = feature_msg->channels[3].values[i];
-        double velocity_x = feature_msg->channels[4].values[i];
+        double velocity_x = feature_msg->channels[4].values[i];//像素速度
         double velocity_y = feature_msg->channels[5].values[i];
+        // 如果消息中包含更多信息（至少6个通道），则解析并存储特征点的全局坐标
         if(feature_msg->channels.size() > 5)
         {
             double gx = feature_msg->channels[6].values[i];
@@ -183,10 +186,15 @@ void feature_callback(const sensor_msgs::PointCloudConstPtr &feature_msg)
             pts_gt[feature_id] = Eigen::Vector3d(gx, gy, gz);
             //printf("receive pts gt %d %f %f %f\n", feature_id, gx, gy, gz);
         }
+        // 校验特征点的深度为1
         ROS_ASSERT(z == 1);
         Eigen::Matrix<double, 7, 1> xyz_uv_velocity;
         xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;
+        // 将特征点信息存储到映射中，特征点ID作为键，特征点数据作为值
         featureFrame[feature_id].emplace_back(camera_id,  xyz_uv_velocity);
+        //接受构造新元素所需的参数，这些参数将传递给元素类型的构造函数。
+        //它将这些参数传递给容器内部的构造函数，以便创建新的元素。
+        //比 push_back 更高效，特别是在处理自定义类型时，因为它避免了不必要的复制或移动操作。
     }
     double t = feature_msg->header.stamp.toSec();
     estimator.inputFeature(t, featureFrame);

@@ -13,7 +13,7 @@ wheel_topic: "/ridgeback_velocity_controller/odom"   #"/ridgeback_velocity_contr
 #TODO check the distortion
 image0_topic: "/camera/infra1/image_rect_raw"
 image1_topic: "/camera/infra2/image_rect_raw"
-output_path: "/home/td/slam/vins_fusion_ws/src/VINS-Fusion/output"
+output_path: "/root/catkin_ws/src/VIW-Fusion/output/"
 
 cam0_calib: "infra1.yaml"
 cam1_calib: "infra2.yaml"
@@ -53,7 +53,7 @@ body_T_cam1: !!opencv-matrix
 
 
 # Extrinsic parameter between IMU and Wheel.
-estimate_wheel_extrinsic: 0   # 0  Have an accurate extrinsic parameters. We will trust the following imu^R_cam, imu^T_cam, don't change it.
+estimate_wheel_extrinsic: 1   # 0  Have an accurate extrinsic parameters. We will trust the following imu^R_cam, imu^T_cam, don't change it.
 # 1  Have an initial guess about extrinsic parameters. We will optimize around your initial guess.
 # 2  Don't know anything about extrinsic parameters. You don't need to give R,T. We will try to calibrate it. Do some rotation movement at beginning.
 #If you choose 0 or 1, you should write down the following matrix.
@@ -75,7 +75,7 @@ body_T_wheel: !!opencv-matrix
          0, 0, 0, 1]
 
 
-#plane noise
+#plane noise 平面约束的噪声
 #mono:0.01 stereo:0.005
 roll_n: 0.01
 #mono:0.01  stereo:0.005
@@ -118,7 +118,7 @@ estimate_wheel_intrinsic: 0
 # 1  Have an initial guess about intrinsic parameters. We will optimize around your initial guess.
 # 2  TODO Don't know anything about intrinsic parameters. You don't need to give sx, sy, sw. We will try to calibrate it. Do some rotation movement at beginning.
 #If you choose 0 or 1, you should write down the following sx, sy, sw.
-# wheel intrinsic
+# wheel intrinsic 轮速内参，理解为各个方向速度的修正因子。给的是初值，运行时会进行在线标定。
 sx: 1.0
 sy: 1.0
 sw: 1.0
@@ -132,5 +132,5 @@ estimate_td_wheel: 0                      # online estimate time offset between 
 td_wheel: 0.0                             # initial value of time offset. unit: s. readed image clock + td = real image clock (IMU clock)
 #loop closure parameters
 load_previous_pose_graph: 0        # load and reuse previous pose graph; load from 'pose_graph_save_path'
-pose_graph_save_path: "/home/td/slam/vins_fusion_ws/src/VINS-Fusion/output/pose_graph" # save and load path
+pose_graph_save_path: "/root/catkin_ws/src/VIW-Fusion/output/pose_graph" # save and load path
 save_image: 0                   # save image in pose graph for visualization prupose; you can close this function by setting 0 

@@ -11,7 +11,7 @@
 #include "camodocal/calib/CameraCalibration.h"
 #include "camodocal/chessboard/Chessboard.h"
 #include "camodocal/gpl/gpl.h"
-
+#include <opencv2/imgproc/imgproc_c.h>
 int
 main( int argc, char** argv )
 {

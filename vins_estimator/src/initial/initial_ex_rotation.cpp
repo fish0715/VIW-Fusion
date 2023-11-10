@@ -19,31 +19,33 @@ InitialEXRotation::InitialEXRotation(){
     ric = Matrix3d::Identity();
 }
 
+// 估计外部旋转矩阵
 bool InitialEXRotation::CalibrationExRotation(vector<pair<Vector3d, Vector3d>> corres, Quaterniond delta_q_imu, Matrix3d &calib_ric_result)
 {
     frame_count++;
-    Rc.push_back(solveRelativeR(corres));
-    Rimu.push_back(delta_q_imu.toRotationMatrix());
-    Rc_g.push_back(ric.inverse() * delta_q_imu * ric);
+    Rc.push_back(solveRelativeR(corres));   // 解算相对旋转矩阵并存储
+    Rimu.push_back(delta_q_imu.toRotationMatrix()); // 存储IMU的旋转矩阵
+    Rc_g.push_back(ric.inverse() * delta_q_imu * ric);  // 计算更新后的Rc_g
 
     Eigen::MatrixXd A(frame_count * 4, 4);
     A.setZero();
-    int sum_ok = 0;
+    int sum_ok = 0; // 有效数据点计数
     for (int i = 1; i <= frame_count; i++)
     {
         Quaterniond r1(Rc[i]);
         Quaterniond r2(Rc_g[i]);
 
-        double angular_distance = 180 / M_PI * r1.angularDistance(r2);
+        double angular_distance = 180 / M_PI * r1.angularDistance(r2);  // 计算两个旋转之间的角度差
         ROS_DEBUG(
             "%d %f", i, angular_distance);
-
+        // 使用Huber权重函数
         double huber = angular_distance > 5.0 ? 5.0 / angular_distance : 1.0;
         ++sum_ok;
         Matrix4d L, R;
 
         double w = Quaterniond(Rc[i]).w();
         Vector3d q = Quaterniond(Rc[i]).vec();
+        // 构造左乘矩阵L
         L.block<3, 3>(0, 0) = w * Matrix3d::Identity() + Utility::skewSymmetric(q);
         L.block<3, 1>(0, 3) = q;
         L.block<1, 3>(3, 0) = -q.transpose();
@@ -52,22 +54,24 @@ bool InitialEXRotation::CalibrationExRotation(vector<pair<Vector3d, Vector3d>> c
         Quaterniond R_ij(Rimu[i]);
         w = R_ij.w();
         q = R_ij.vec();
+        // 构造右乘矩阵R
         R.block<3, 3>(0, 0) = w * Matrix3d::Identity() - Utility::skewSymmetric(q);
         R.block<3, 1>(0, 3) = q;
         R.block<1, 3>(3, 0) = -q.transpose();
         R(3, 3) = w;
-
+        // 计算Huber加权后的A矩阵
         A.block<4, 4>((i - 1) * 4, 0) = huber * (L - R);
     }
-
+    // 使用奇异值分解（SVD）解算
     JacobiSVD<MatrixXd> svd(A, ComputeFullU | ComputeFullV);
     Matrix<double, 4, 1> x = svd.matrixV().col(3);
     Quaterniond estimated_R(x);
-    ric = estimated_R.toRotationMatrix().inverse();
+    ric = estimated_R.toRotationMatrix().inverse(); // 更新外部旋转矩阵ric
     //cout << svd.singularValues().transpose() << endl;
     //cout << ric << endl;
     Vector3d ric_cov;
     ric_cov = svd.singularValues().tail<3>();
+    // 检查条件，如果满足条件则返回最终的外部旋转矩阵
     if (frame_count >= WINDOW_SIZE && ric_cov(1) > 0.25)//TODO 为什么判断index=1处的值
     {
         calib_ric_result = ric;

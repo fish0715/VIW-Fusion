@@ -56,7 +56,7 @@ void registerPub(ros::NodeHandle &n)
     cameraposevisual.setScale(0.1);
     cameraposevisual.setLineWidth(0.01);
 }
-
+//pub最新的odometry消息imu_propagate
 void pubLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaterniond &Q, const Eigen::Vector3d &V, double t)
 {
     nav_msgs::Odometry odometry;

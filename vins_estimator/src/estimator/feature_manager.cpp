@@ -118,6 +118,7 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
     }
 }
 
+// 用于获取两个帧之间匹配的特征点对
 vector<pair<Vector3d, Vector3d>> FeatureManager::getCorresponding(int frame_count_l, int frame_count_r)
 {
     vector<pair<Vector3d, Vector3d>> corres;
@@ -128,14 +129,15 @@ vector<pair<Vector3d, Vector3d>> FeatureManager::getCorresponding(int frame_coun
             Vector3d a = Vector3d::Zero(), b = Vector3d::Zero();
             int idx_l = frame_count_l - it.start_frame;
             int idx_r = frame_count_r - it.start_frame;
-
+            // 获取特征点在左帧（frame_count_l）的位置
             a = it.feature_per_frame[idx_l].point;
-
+            // 获取特征点在右帧（frame_count_r）的位置
             b = it.feature_per_frame[idx_r].point;
-            
+            // 将匹配的特征点对添加到corres中
             corres.push_back(make_pair(a, b));
         }
     }
+    // 返回匹配的特征点对
     return corres;
 }
 
@@ -256,10 +258,10 @@ bool FeatureManager::solvePoseByPnP(Eigen::Matrix3d &R, Eigen::Vector3d &P,
     return true;
 }
 /**
- *
+ *PnP算法初始化相机帧的姿态
  * @param frameCnt
- * @param Ps
- * @param Rs
+ * @param Ps 估计的姿态信息
+ * @param Rs 估计的姿态信息
  * @param tic
  * @param ric
  */
@@ -267,9 +269,11 @@ void FeatureManager::initFramePoseByPnP(int frameCnt, Vector3d Ps[], Matrix3d Rs
 {
     //对第一帧图像不做处理；因为此时路标点还未三角化，需要利用第一帧双目图像，进行路标点三角化
     if(frameCnt > 0)
-    {
+    {   // 先判断当前特征中那些已经三角化出深度的点，计算出世界系坐标存入pts3D，相应的当前帧的归一化平面坐标存入pts2D
+        // 创建用于PnP求解的特征点容器
         vector<cv::Point2f> pts2D;
         vector<cv::Point3f> pts3D;
+        // 遍历所有特征点
         for (auto &it_per_id : feature)
         {
             if (it_per_id.estimated_depth > 0)
@@ -277,11 +281,14 @@ void FeatureManager::initFramePoseByPnP(int frameCnt, Vector3d Ps[], Matrix3d Rs
                 int index = frameCnt - it_per_id.start_frame;
                 if((int)it_per_id.feature_per_frame.size() >= index + 1)//该路标点从start_frame图像帧到frameCnt对应的图像帧都能被观测到
                 {
+                    // 获取特征点的三维坐标
                     Vector3d ptsInCam = ric[0] * (it_per_id.feature_per_frame[0].point * it_per_id.estimated_depth) + tic[0];
                     Vector3d ptsInWorld = Rs[it_per_id.start_frame] * ptsInCam + Ps[it_per_id.start_frame];
 
+                    // 将特征点坐标转换为PnP需要的格式
                     cv::Point3f point3d(ptsInWorld.x(), ptsInWorld.y(), ptsInWorld.z());
                     cv::Point2f point2d(it_per_id.feature_per_frame[index].point.x(), it_per_id.feature_per_frame[index].point.y());
+                    // 存储特征点
                     pts3D.push_back(point3d);
                     pts2D.push_back(point2d); 
                 }
@@ -292,7 +299,7 @@ void FeatureManager::initFramePoseByPnP(int frameCnt, Vector3d Ps[], Matrix3d Rs
         // trans to w_T_cam 以上一帧图像在世界坐标系下的pose作为当前帧PnP求解的初值
         RCam = Rs[frameCnt - 1] * ric[0];
         PCam = Rs[frameCnt - 1] * tic[0] + Ps[frameCnt - 1];
-
+        // 调用PnP算法求解姿态
         if(solvePoseByPnP(RCam, PCam, pts2D, pts3D))
         {
             // trans to w_T_imu
@@ -305,17 +312,18 @@ void FeatureManager::initFramePoseByPnP(int frameCnt, Vector3d Ps[], Matrix3d Rs
         }
     }
 }
-
+// 双目三角化，结果放入了feature的estimated_depth中
 void FeatureManager::triangulate(int frameCnt, Vector3d Ps[], Matrix3d Rs[], Vector3d tic[], Matrix3d ric[])
 {
-    for (auto &it_per_id : feature)
+    for (auto &it_per_id : feature) // 遍历特征点
     {
-        if (it_per_id.estimated_depth > 0)
+        if (it_per_id.estimated_depth > 0)  // 特征点已经被重建
             continue;
 
-        if(STEREO && it_per_id.feature_per_frame[0].is_stereo)
+        if(STEREO && it_per_id.feature_per_frame[0].is_stereo)  // 如果使用了双目,并且特征点也是双目观测的
         {
             int imu_i = it_per_id.start_frame;
+            //利用imu的位姿计算左相机位姿
             Eigen::Matrix<double, 3, 4> leftPose;
             Eigen::Vector3d t0 = Ps[imu_i] + Rs[imu_i] * tic[0];//w_t_cl
             Eigen::Matrix3d R0 = Rs[imu_i] * ric[0];//w_R_cl
@@ -323,6 +331,7 @@ void FeatureManager::triangulate(int frameCnt, Vector3d Ps[], Matrix3d Rs[], Vec
             leftPose.rightCols<1>() = -R0.transpose() * t0;//cl_t_w
             //cout << "left pose " << leftPose << endl;
 
+            //利用imu的位姿计算右相机位姿
             Eigen::Matrix<double, 3, 4> rightPose;
             Eigen::Vector3d t1 = Ps[imu_i] + Rs[imu_i] * tic[1];//w_t_cr
             Eigen::Matrix3d R1 = Rs[imu_i] * ric[1];//w_R_cr
@@ -337,9 +346,10 @@ void FeatureManager::triangulate(int frameCnt, Vector3d Ps[], Matrix3d Rs[], Vec
             //cout << "point0 " << point0.transpose() << endl;
             //cout << "point1 " << point1.transpose() << endl;
 
-            triangulatePoint(leftPose, rightPose, point0, point1, point3d);
+            triangulatePoint(leftPose, rightPose, point0, point1, point3d); //利用svd方法对双目进行三角化
+            //得到imu坐标系下的三维点坐标
             Eigen::Vector3d localPoint;
-            localPoint = leftPose.leftCols<3>() * point3d + leftPose.rightCols<1>();
+            localPoint = leftPose.leftCols<3>() * point3d + leftPose.rightCols<1>();//求得左相机坐标系下的坐标
             double depth = localPoint.z();
             if (depth > 0)
                 it_per_id.estimated_depth = depth;

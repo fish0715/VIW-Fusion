@@ -10,7 +10,9 @@
  *******************************************************/
 
 #include "initial_alignment.h"
-
+// 更新得到新的陀螺仪漂移Bgs
+// 对应视觉IMU对其的第二部分
+// 对应 https://mp.weixin.qq.com/s/9twYJMOE8oydAzqND0UmFw 中的公式31-34
 void solveGyroscopeBias(map<double, ImageFrame> &all_image_frame, Vector3d* Bgs)
 {
     Matrix3d A;
@@ -42,7 +44,7 @@ void solveGyroscopeBias(map<double, ImageFrame> &all_image_frame, Vector3d* Bgs)
     for (frame_i = all_image_frame.begin(); next(frame_i) != all_image_frame.end( ); frame_i++)
     {
         frame_j = next(frame_i);
-        frame_j->second.pre_integration->repropagate(Vector3d::Zero(), Bgs[0]);
+        frame_j->second.pre_integration->repropagate(Vector3d::Zero(), Bgs[0]);//求解出陀螺仪的bias后，需要对IMU预积分值进行重新计算。
     }
 }
 

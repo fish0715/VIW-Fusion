@@ -63,7 +63,7 @@ class WheelIntegrationBase
         for (int i = 0; i < static_cast<int>(dt_buf.size()); i++)
             propagate(dt_buf[i], vel_buf[i], gyr_buf[i]);
     }
-    //预积分，且进行了预积分的协方差累计，进行了预积分相对bias的变化的变化雅可比的计算
+    //! Wheel 预积分，且进行了预积分的协方差累计，进行了预积分相对bias的变化的变化雅可比的计算
     void midPointIntegration(double _dt,
                              const Eigen::Vector3d &_vel_0, const Eigen::Vector3d &_gyr_0,
                              const Eigen::Vector3d &_vel_1, const Eigen::Vector3d &_gyr_1,
@@ -82,7 +82,6 @@ class WheelIntegrationBase
         Vector3d un_vel_1 = result_delta_q * sv * _vel_1;
         Vector3d un_vel = 0.5 * (un_vel_0 + un_vel_1);
         result_delta_p = delta_p + un_vel * _dt;
-
 
 
         result_linearized_sx = linearized_sx;
@@ -108,7 +107,8 @@ class WheelIntegrationBase
 
             MatrixXd F = MatrixXd::Zero(6, 6);
             F.block<3, 3>(0, 0) = Matrix3d::Identity();
-            F.block<3, 3>(0, 3) = -0.5 * _dt * (delta_q.toRotationMatrix() * R_vel_0_x + result_delta_q.toRotationMatrix() * R_vel_1_x * delta_delta_q.toRotationMatrix().transpose());
+            F.block<3, 3>(0, 3) = -0.5 * _dt * (delta_q.toRotationMatrix() * R_vel_0_x + 
+                                    result_delta_q.toRotationMatrix() * R_vel_1_x * delta_delta_q.toRotationMatrix().transpose());
             F.block<3, 3>(3, 3) = delta_delta_q.toRotationMatrix().transpose();
             //cout<<"A"<<endl<<A<<endl;
             Eigen::Matrix3d Jr;
@@ -143,7 +143,7 @@ class WheelIntegrationBase
         }
 
     }
-
+    //! Wheel
     void propagate(double _dt, const Eigen::Vector3d &_vel_1, const Eigen::Vector3d &_gyr_1)
     {
         dt = _dt;

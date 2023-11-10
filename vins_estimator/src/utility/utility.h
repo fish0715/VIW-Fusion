@@ -20,6 +20,7 @@ class Utility
 {
   public:
     template <typename Derived>
+    // 这个函数接受一个名为 theta 的输入参数，这个参数是一个角度或旋转矩阵。函数的目的是将输入的旋转角度转换为四元数的增量。
     static Eigen::Quaternion<typename Derived::Scalar> deltaQ(const Eigen::MatrixBase<Derived> &theta)
     {
         typedef typename Derived::Scalar Scalar_t;
